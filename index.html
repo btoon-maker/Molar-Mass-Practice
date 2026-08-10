@@ -79,7 +79,7 @@ main{max-width:940px;margin:0 auto;padding:20px 16px 60px}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 .locked{opacity:.6;pointer-events:none}
 footer.app-footer{text-align:center;color:var(--ink-soft);font-size:.78rem;padding:20px}
-sub{font-size:.7em}
+sub{font-size:.7em;line-height:0;vertical-align:baseline;position:relative;bottom:-.32em}
 @media(max-width:720px){.card{padding:16px}.tally-table th:nth-child(3),.tally-table th:nth-child(4){font-size:.68rem}}
 @media print{.app-header,.btn-row,.controls-row,.no-print,.progress-trail,.topnav{display:none!important}body{background:#fff}main{max-width:100%}.export-item{break-inside:avoid;page-break-inside:avoid}}
 </style>
@@ -352,6 +352,7 @@ let activeCompound = null;
 let activeCounts = {}; // student-entered counts, keyed by element
 let activeSubtotals = {}; // student-entered subtotals
 let countsLocked = false;
+let pendingCorrectTotal = null;
 
 function loadProblem(idx, reasonText){
   session.index = idx;
@@ -359,6 +360,7 @@ function loadProblem(idx, reasonText){
   activeCounts = {};
   activeSubtotals = {};
   countsLocked = false;
+  pendingCorrectTotal = null;
 
   document.getElementById('level-heading').innerHTML = formulaDisplay(activeCompound.formula);
   document.getElementById('molName').textContent = activeCompound.name;
@@ -498,27 +500,46 @@ document.getElementById('btnCheckTotal').addEventListener('click', ()=>{
     return;
   }
   totalInput.setAttribute('aria-invalid','false');
-  box.innerHTML = '<div class="feedback good">Correct! '+formulaDisplay(activeCompound.formula)+' has a molar mass of '+correctTotal.toFixed(2)+' g/mol.</div>';
-  finishProblem(correctTotal);
+  box.innerHTML = '<div class="feedback good">Correct! '+formulaDisplay(activeCompound.formula)+' has a molar mass of '+correctTotal.toFixed(2)+' g/mol. Explain your thinking below to complete this problem.</div>';
+  pendingCorrectTotal = correctTotal;
+  document.getElementById('totalInput').disabled = true;
+  document.getElementById('btnCheckTotal').disabled = true;
+  document.getElementById('doneStep').style.display = 'none';
+  saveSession();
+  document.getElementById('reasonBox').focus();
+  updateCompletionFromReason();
 });
 
 function finishProblem(correctTotal){
+  const reasoning = document.getElementById('reasonBox').value.trim();
+  if(!reasoning) return;
   session.results[session.index] = {
     formula: activeCompound.formula, name: activeCompound.name,
     counts: {...activeCompound.counts},
     subtotals: Object.fromEntries(Object.keys(activeCompound.counts).map(el=>[el, round2(activeCompound.counts[el]*ATOMIC_MASS[el])])),
     total: correctTotal,
-    reasoning: document.getElementById('reasonBox').value
+    reasoning
   };
-  document.getElementById('totalInput').disabled = true;
-  document.getElementById('btnCheckTotal').disabled = true;
   document.getElementById('doneStep').style.display = 'block';
   document.getElementById('btnNextProblem').textContent = session.index<4 ? 'Continue →' : 'See your report →';
   renderProgressTrail();
   saveSession();
 }
 
-document.getElementById('reasonBox').addEventListener('input', ()=>{ saveSession(); });
+function updateCompletionFromReason(){
+  const reasoning = document.getElementById('reasonBox').value.trim();
+  saveSession();
+  if(pendingCorrectTotal !== null && reasoning){
+    finishProblem(pendingCorrectTotal);
+  } else if(pendingCorrectTotal !== null){
+    session.results[session.index] = null;
+    document.getElementById('doneStep').style.display = 'none';
+    renderProgressTrail();
+    saveSession();
+  }
+}
+
+document.getElementById('reasonBox').addEventListener('input', updateCompletionFromReason);
 
 document.getElementById('btnPracticeAgain').addEventListener('click', ()=>{
   loadProblem(session.index, '');
@@ -622,7 +643,7 @@ function buildExportHTML(title){
       '</div>';
   });
   return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+escapeHtml(title)+'</title>'+
-    '<style>body{font-family:Inter,system-ui,sans-serif;max-width:720px;margin:30px auto;padding:0 16px;color:#211E1E;} h1{font-family:\'Space Grotesk\',sans-serif;color:#5B5654;font-weight:500;font-size:1.1rem;} sub{font-size:.7em;} table{border-collapse:collapse;width:100%;} th,td{border-bottom:1px solid #E4DDD3;padding:6px 8px;text-align:left;font-size:.9rem;}</style></head>'+
+    '<style>body{font-family:Inter,system-ui,sans-serif;max-width:720px;margin:30px auto;padding:0 16px;color:#211E1E;} h1{font-family:\'Space Grotesk\',sans-serif;color:#5B5654;font-weight:500;font-size:1.1rem;} sub{font-size:.7em;line-height:0;vertical-align:baseline;position:relative;bottom:-.32em;} table{border-collapse:collapse;width:100%;} th,td{border-bottom:1px solid #E4DDD3;padding:6px 8px;text-align:left;font-size:.9rem;}</style></head>'+
     '<body><h1>'+escapeHtml(title)+'</h1>'+items+'</body></html>';
 }
 
