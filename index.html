@@ -49,7 +49,10 @@ main{max-width:940px;margin:0 auto;padding:20px 16px 60px}
 .phase-title{font-size:1.05rem;margin-bottom:4px}.phase-help{color:var(--ink-soft);font-size:.88rem;margin:0 0 14px}
 .tally-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:.9rem}
 .tally-table th,.tally-table td{border-bottom:1px solid var(--line);padding:10px 8px;text-align:left}
-.tally-table th{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft)}
+.tally-table thead th{font-size:.78rem;letter-spacing:.04em;color:var(--ink-soft)}
+.tally-table tbody th,.atomic-mass-table tbody th{ text-transform:none!important;letter-spacing:normal }
+.element-symbol{font-family:var(--mono);text-transform:none!important;font-variant:normal!important;letter-spacing:normal!important}
+.unit-text{text-transform:none!important;font-variant:normal!important;letter-spacing:normal!important}
 .tally-table input{width:80px;padding:7px 8px;border:2px solid var(--control-line);border-radius:8px;font-family:var(--mono);font-size:.92rem}
 .tally-table input.bad{border-color:var(--bad)}.tally-table input.good{border-color:var(--good)}
 .feedback{display:flex;gap:10px;align-items:flex-start;border-radius:10px;padding:12px 16px;font-size:.9rem;margin-top:10px}
@@ -79,7 +82,7 @@ main{max-width:940px;margin:0 auto;padding:20px 16px 60px}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 .locked{opacity:.6;pointer-events:none}
 footer.app-footer{text-align:center;color:var(--ink-soft);font-size:.78rem;padding:20px}
-sub{font-size:.7em;line-height:0;vertical-align:baseline;position:relative;bottom:-.32em}
+sub{font-size:.72em;line-height:0;vertical-align:sub;position:static}
 @media(max-width:720px){.card{padding:16px}.tally-table th:nth-child(3),.tally-table th:nth-child(4){font-size:.68rem}}
 @media print{.app-header,.btn-row,.controls-row,.no-print,.progress-trail,.topnav{display:none!important}body{background:#fff}main{max-width:100%}.export-item{break-inside:avoid;page-break-inside:avoid}}
 </style>
@@ -264,6 +267,10 @@ function showScreen(id){
 function formulaDisplay(f){
   return f.replace(/([A-Za-z\)])(\d+)/g, function(m,ch,num){ return ch+'<sub>'+num+'</sub>'; });
 }
+function elementSymbolDisplay(symbol){
+  const s=String(symbol||'');
+  return s ? s.charAt(0).toUpperCase()+s.slice(1).toLowerCase() : '';
+}
 function round2(n){ return Math.round(n*100)/100; }
 function computeMolarMass(counts){
   let total = 0;
@@ -386,14 +393,14 @@ function loadProblem(idx, reasonText){
 function renderTally(){
   const host = document.getElementById('tallyHost');
   const elements = Object.keys(activeCompound.counts);
-  let html = '<table class="tally-table"><thead><tr><th scope="col">Element</th><th scope="col">Count in formula</th><th scope="col">Atomic mass (g/mol)</th><th scope="col">Subtotal (g/mol)</th></tr></thead><tbody>';
+  let html = '<table class="tally-table"><thead><tr><th scope="col">ELEMENT</th><th scope="col">COUNT IN FORMULA</th><th scope="col">ATOMIC MASS (<span class="unit-text">g/mol</span>)</th><th scope="col">SUBTOTAL (<span class="unit-text">g/mol</span>)</th></tr></thead><tbody>';
   elements.forEach(el=>{
     const countVal = activeCounts[el] !== undefined ? activeCounts[el] : '';
     const subVal = activeSubtotals[el] !== undefined ? activeSubtotals[el] : '';
-    html += '<tr><th scope="row"><strong>'+el+'</strong></th>'+
-      '<td><input type="text" inputmode="numeric" class="count-input" data-el="'+el+'" value="'+countVal+'" aria-label="Count of '+el+' atoms" aria-describedby="tallyFeedback" aria-invalid="false" '+(countsLocked?'disabled':'')+'></td>'+
+    html += '<tr><th scope="row"><strong class="element-symbol">'+elementSymbolDisplay(el)+'</strong></th>'+
+      '<td><input type="text" inputmode="numeric" class="count-input" data-el="'+el+'" value="'+countVal+'" aria-label="Count of '+elementSymbolDisplay(el)+' atoms" aria-describedby="tallyFeedback" aria-invalid="false" '+(countsLocked?'disabled':'')+'></td>'+
       '<td>'+ATOMIC_MASS[el].toFixed(2)+'</td>'+
-      '<td><input type="text" inputmode="decimal" class="sub-input" data-el="'+el+'" value="'+subVal+'" aria-label="Subtotal for '+el+'" aria-describedby="tallyFeedback" aria-invalid="false" '+(countsLocked?'disabled':'')+'></td></tr>';
+      '<td><input type="text" inputmode="decimal" class="sub-input" data-el="'+el+'" value="'+subVal+'" aria-label="Subtotal for '+elementSymbolDisplay(el)+'" aria-describedby="tallyFeedback" aria-invalid="false" '+(countsLocked?'disabled':'')+'></td></tr>';
   });
   html += '</tbody></table>';
   host.innerHTML = html;
@@ -444,7 +451,7 @@ document.getElementById('btnCheckTally').addEventListener('click', ()=>{
     if(firstBad.type==='count'){
       box.innerHTML = '<div class="feedback bad">Recheck the count for '+firstBad.el+'. Look at the formula carefully &mdash; is '+firstBad.el+' inside a parenthesis with a subscript outside it?</div>';
     } else {
-      box.innerHTML = '<div class="feedback bad">'+firstBad.el+'\u2019s count is right, but its subtotal isn\u2019t. Multiply the count by the atomic mass shown.</div>';
+      box.innerHTML = '<div class="feedback bad">'+elementSymbolDisplay(firstBad.el)+'\u2019s count is right, but its subtotal isn\u2019t. Multiply the count by the atomic mass shown.</div>';
     }
     const badInput = firstBad.type==='count'
       ? document.querySelector('.count-input[data-el="'+firstBad.el+'"]')
@@ -589,8 +596,8 @@ function renderAccessibleAtomicMasses(){
   const host = document.getElementById('periodicAccessibleData');
   if(host.dataset.ready==='true') return;
   const entries = Object.entries(ATOMIC_MASS);
-  let html = '<table class="atomic-mass-table"><thead><tr><th scope="col">Element</th><th scope="col">Atomic mass (g/mol)</th></tr></thead><tbody>';
-  entries.forEach(([el,mass])=>{ html += '<tr><th scope="row">'+el+'</th><td>'+Number(mass).toFixed(2)+'</td></tr>'; });
+  let html = '<table class="atomic-mass-table"><thead><tr><th scope="col">Element</th><th scope="col">Atomic mass (<span class="unit-text">g/mol</span>)</th></tr></thead><tbody>';
+  entries.forEach(([el,mass])=>{ html += '<tr><th scope="row"><span class="element-symbol">'+elementSymbolDisplay(el)+'</span></th><td>'+Number(mass).toFixed(2)+'</td></tr>'; });
   html += '</tbody></table>';
   host.innerHTML = html;
   host.dataset.ready='true';
@@ -608,9 +615,9 @@ document.getElementById('periodicModal').addEventListener('click', e=>{ if(e.tar
 function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function buildResultTableHTML(r){
-  let html = '<table class="tally-table" style="margin-top:6px;"><thead><tr><th scope="col">Element</th><th scope="col">Count</th><th scope="col">Atomic mass</th><th scope="col">Subtotal</th></tr></thead><tbody>';
+  let html = '<table class="tally-table" style="margin-top:6px;"><thead><tr><th scope="col">ELEMENT</th><th scope="col">COUNT</th><th scope="col">ATOMIC MASS</th><th scope="col">SUBTOTAL</th></tr></thead><tbody>';
   Object.keys(r.counts).forEach(el=>{
-    html += '<tr><th scope="row">'+el+'</th><td>'+r.counts[el]+'</td><td>'+ATOMIC_MASS[el].toFixed(2)+'</td><td>'+r.subtotals[el].toFixed(2)+'</td></tr>';
+    html += '<tr><th scope="row"><span class="element-symbol">'+elementSymbolDisplay(el)+'</span></th><td>'+r.counts[el]+'</td><td>'+ATOMIC_MASS[el].toFixed(2)+'</td><td>'+r.subtotals[el].toFixed(2)+'</td></tr>';
   });
   html += '</tbody></table><div style="margin-top:8px;font-family:var(--mono);font-weight:600;">Total molar mass: '+r.total.toFixed(2)+' g/mol</div>';
   return html;
